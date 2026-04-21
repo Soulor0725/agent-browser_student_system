@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO 便签</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .input-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        select {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .todo-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .todo-item {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .todo-item:hover {
+            transform: translateX(5px);
+        }
+        
+        .todo-item.completed {
+            opacity: 0.6;
+            background: #f5f5f5;
+        }
+        
+        .todo-item.completed .todo-content {
+            text-decoration: line-through;
+            color: #999;
+        }
+        
+        .todo-item.high {
+            border-left: 5px solid #ff4757;
+        }
+        
+        .todo-item.medium {
+            border-left: 5px solid #ffa502;
+        }
+        
+        .todo-item.low {
+            border-left: 5px solid #2ed573;
+        }
+        
+        .checkbox {
+            width: 25px;
+            height: 25px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        
+        .todo-content {
+            flex: 1;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .priority-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .priority-badge.high {
+            background: #ff4757;
+            color: white;
+        }
+        
+        .priority-badge.medium {
+            background: #ffa502;
+            color: white;
+        }
+        
+        .priority-badge.low {
+            background: #2ed573;
+            color: white;
+        }
+        
+        .delete-btn {
+            padding: 8px 15px;
+            background: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .delete-btn:hover {
+            background: #ff3344;
+        }
+        
+        .stats {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📝 TODO 便签</h1>
+        
+        <div class="input-section">
+            <div class="input-row">
+                <input type="text" id="todoInput" placeholder="输入新的待办事项..." onkeypress="handleKeyPress(event)">
+                <select id="prioritySelect">
+                    <option value="high">🔴 高</option>
+                    <option value="medium" selected>🟡 中</option>
+                    <option value="low">🟢 低</option>
+                </select>
+                <button onclick="addTodo()">添加</button>
+            </div>
+        </div>
+        
+        <div class="todo-list" id="todoList"></div>
+        
+        <div class="stats" id="stats"></div>
+    </div>
+    
+    <script>
+        const API_URL = '/api/todos';
+        
+        async function loadTodos() {
+            try {
+                const response = await fetch(API_URL);
+                const todos = await response.json();
+                renderTodos(todos);
+            } catch (error) {
+                console.error('加载失败:', error);
+            }
+        }
+        
+        function renderTodos(todos) {
+            const todoList = document.getElementById('todoList');
+            const stats = document.getElementById('stats');
+            
+            todoList.innerHTML = todos.map(todo => `
+                <div class="todo-item ${todo.completed ? 'completed' : ''} ${todo.priority}">
+                    <input type="checkbox" class="checkbox" ${todo.completed ? 'checked' : ''} 
+                           onchange="toggleTodo(${todo.id}, this.checked)">
+                    <span class="todo-content">${escapeHtml(todo.content)}</span>
+                    <span class="priority-badge ${todo.priority}">${getPriorityText(todo.priority)}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">删除</button>
+                </div>
+            `).join('');
+            
+            const completed = todos.filter(t => t.completed).length;
+            stats.innerHTML = `总计: ${todos.length} | 已完成: ${completed} | 未完成: ${todos.length - completed}`;
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function getPriorityText(priority) {
+            const map = { high: '高', medium: '中', low: '低' };
+            return map[priority] || '中';
+        }
+        
+        async function addTodo() {
+            const input = document.getElementById('todoInput');
+            const select = document.getElementById('prioritySelect');
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert('请输入内容');
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, priority: select.value })
+                });
+                
+                if (response.ok) {
+                    input.value = '';
+                    loadTodos();
+                }
+            } catch (error) {
+                console.error('添加失败:', error);
+            }
+        }
+        
+        async function toggleTodo(id, completed) {
+            try {
+                await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed })
+                });
+                loadTodos();
+            } catch (error) {
+                console.error('更新失败:', error);
+            }
+        }
+        
+        async function deleteTodo(id) {
+            if (!confirm('确定删除?')) return;
+            
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                loadTodos();
+            } catch (error) {
+                console.error('删除失败:', error);
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                addTodo();
+            }
+        }
+        
+        // 初始加载
+        loadTodos();
+    </script>
+</body>
+</html>
