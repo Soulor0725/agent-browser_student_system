@@ -26,7 +26,7 @@ STUDENT_NAME = "浪子"
 STUDENT_AGE = "29"
 STUDENT_CLASS = "21131"
 STEP_WAIT_MS = 1200
-DB_FILE = Path(__file__).resolve().parents[1] / "student_management" / "data" / "student_management.db"
+DB_FILE = Path(__file__).resolve().parent.parent / "student_management" / "data" / "student_management.db"
 
 # 邮件配置
 EMAIL_CONFIG = {
@@ -217,8 +217,21 @@ def test_register_case(page) -> bool:
         page.goto(REGISTER_URL, wait_until="domcontentloaded")
         page.wait_for_timeout(STEP_WAIT_MS)
         
+        # 强制刷新页面，清除可能的缓存错误信息
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_timeout(STEP_WAIT_MS)
+        
         print(f"[DEBUG] 注册页面 URL: {page.url}")
         print(f"[DEBUG] 注册页面标题: {page.title()}")
+        
+        # 检查页面是否有错误信息
+        try:
+            error_element = page.locator(".error-text")
+            if error_element.count() > 0:
+                error_text = error_element.text_content()
+                print(f"[DEBUG] 页面存在错误信息: {error_text}")
+        except:
+            print("[DEBUG] 页面没有错误信息")
         
         page.fill("#username", REGISTER_USERNAME)
         page.wait_for_timeout(STEP_WAIT_MS)
@@ -226,8 +239,21 @@ def test_register_case(page) -> bool:
         page.wait_for_timeout(STEP_WAIT_MS)
         
         # 点击注册按钮
+        print("[DEBUG] 准备点击注册按钮")
+        
+        # 监听网络请求
+        def handle_response(response):
+            if response.url.endswith("/register") and response.status == 200:
+                print(f"[DEBUG] 注册请求已发送: {response.url}, 状态码: {response.status}")
+        
+        page.on("response", handle_response)
+        
         page.click("button[type='submit']")
+        print("[DEBUG] 已点击注册按钮")
         page.wait_for_timeout(3000)
+        
+        # 停止监听网络请求
+        page.remove_listener("response", handle_response)
         
         # 等待页面加载完成
         page.wait_for_load_state("networkidle")
@@ -253,8 +279,11 @@ def test_register_case(page) -> bool:
                 print(f"[DEBUG] 页面错误信息: {error_text}")
             except:
                 print("[DEBUG] 没有错误信息")
+        else:
+            print("[DEBUG] 已跳转到登录页")
         
         # 验证用户是否在数据库中
+        print(f"[DEBUG] 开始验证数据库中是否存在用户: {REGISTER_USERNAME}")
         assert_user_exists_in_db(REGISTER_USERNAME, REGISTER_PASSWORD)
         
         save_screenshot(page, "用例1_注册功能")
@@ -436,12 +465,19 @@ def main() -> None:
     cleanup_old_screenshots(hours=1)
     
     with sync_playwright() as p:
+        # 启动浏览器，使用最大化参数
         browser = p.chromium.launch(
             executable_path=r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             headless=False,
             slow_mo=400,
+            args=["--start-maximized"]
         )
+        
+        # 创建页面
         page = browser.new_page()
+        
+        # 等待页面完全加载
+        page.wait_for_load_state("networkidle")
         
         # 执行4个测试用例
         results = []
@@ -861,20 +897,56 @@ def send_report_email(report_path: Path, results: list) -> None:
         failed = total - passed
         pass_rate = (passed / total * 100) if total > 0 else 0
         
+        # 获取测试开始时间和结束时间
+        test_start_time = results[0]["start_time"] if results else ""
+        test_end_time = results[-1]["end_time"] if results else ""
+        
         # 创建邮件
         msg = MIMEMultipart()
         msg["From"] = EMAIL_CONFIG["sender"]
         msg["To"] = EMAIL_CONFIG["recipient"]
-        msg["Subject"] = Header(f"{EMAIL_CONFIG['subject']} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", "utf-8")
+        
+        # 邮件标题格式：系统名_自动化测试报告-年月日时分秒
+        system_name = "学生管理系统"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        email_subject = f"{system_name}_自动化测试报告-{timestamp}"
+        msg["Subject"] = Header(email_subject, "utf-8")
+        
+        # 计算饼图角度
+        pass_angle = (passed / total * 360) if total > 0 else 0
+        
+        # 计算SVG路径坐标（使用正确的角度方向）
+        import math
+        # SVG角度从正x轴开始，顺时针方向
+        pass_radians = pass_angle * math.pi / 180
+        pass_x = 60 + 50 * math.cos(pass_radians - math.pi/2)  # 调整为从12点钟方向开始
+        pass_y = 60 + 50 * math.sin(pass_radians - math.pi/2)
         
         # 邮件正文
         body = f"""
         <h2>自动化测试报告</h2>
-        <p>测试时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p>总用例数: {total} 条</p>
-        <p>通过: {passed} 条</p>
-        <p>失败: {failed} 条</p>
-        <p>通过率: {pass_rate:.1f}%</p>
+        <p>测试开始时间: {test_start_time}</p>
+        <p>测试结束时间: {test_end_time}</p>
+        
+        <div style="display: flex; align-items: center; margin: 20px 0;">
+            <div style="flex: 1;">
+                <p>总用例数: {total} 条</p>
+                <p>通过: {passed} 条</p>
+                <p>失败: {failed} 条</p>
+                <p>通过率: {pass_rate:.1f}%</p>
+            </div>
+            <div style="flex: 1; text-align: center;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="#f0f0f0" />
+                    <path d="M60,60 L60,10 A50,50 0 {1 if pass_angle > 180 else 0},1 {pass_x:.1f},{pass_y:.1f} Z" fill="#4CAF50" />
+                    <path d="M60,60 L{pass_x:.1f},{pass_y:.1f} A50,50 0 {1 if (360 - pass_angle) > 180 else 0},1 60,10 Z" fill="#F44336" />
+                    <circle cx="60" cy="60" r="30" fill="white" />
+                    <text x="60" y="55" text-anchor="middle" font-size="14" fill="#333">{pass_rate:.0f}%</text>
+                    <text x="60" y="75" text-anchor="middle" font-size="10" fill="#666">通过率</text>
+                </svg>
+            </div>
+        </div>
+        
         <p>详细报告请查看附件（Allure 格式 HTML）。</p>
         """
         
