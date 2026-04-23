@@ -74,9 +74,34 @@ python app.py
 
 ### 4.2 运行自动化测试
 
+#### 方法1：直接运行主脚本
+
 ```powershell
 # 在 agent-browser 目录下
 python app.py
+```
+
+#### 方法2：使用 CLI 工具（推荐）
+
+```powershell
+# 在 agent-browser 目录下
+# 运行测试 + 查看报告 + 发送邮件
+python cli.py run && python cli.py report && python cli.py send-mail
+
+# 仅运行测试
+python cli.py run
+
+# 仅查看报告
+python cli.py report
+
+# 仅发送邮件
+python cli.py send-mail
+
+# 运行指定用例
+python cli.py run --case 1  # 运行注册功能测试
+python cli.py run --case 2  # 运行登录功能测试
+python cli.py run --case 3  # 运行添加学生测试
+python cli.py run --case 4  # 运行登录失败测试
 ```
 
 ### 4.3 查看测试结果
