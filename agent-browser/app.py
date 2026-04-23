@@ -922,19 +922,32 @@ def send_report_email(report_path: Path, results: list) -> None:
         pass_x = 60 + 50 * math.cos(pass_radians - math.pi/2)  # 调整为从12点钟方向开始
         pass_y = 60 + 50 * math.sin(pass_radians - math.pi/2)
         
+        # 构建用例详情表格内容
+        case_details = ""
+        for i, r in enumerate(results, 1):
+            status_icon = "✅" if r["passed"] else "❌"
+            status_text = "通过" if r["passed"] else "失败"
+            case_details += f"""
+            <tr>
+                <td>{i}</td>
+                <td style="text-align: left;">{r['name']}</td>
+                <td>{r['start_time']}</td>
+                <td>{r['end_time']}</td>
+                <td>{r['duration']:.2f}s</td>
+                <td>{status_icon} {status_text}</td>
+            </tr>
+            """
+        
         # 邮件正文
         body = f"""
         <h2>自动化测试报告</h2>
-        <p>测试开始时间: {test_start_time}</p>
-        <p>测试结束时间: {test_end_time}</p>
         
-        <div style="display: flex; align-items: center; margin: 20px 0;">
-            <div style="flex: 1;">
-                <p>总用例数: {total} 条</p>
-                <p>通过: {passed} 条</p>
-                <p>失败: {failed} 条</p>
-                <p>通过率: {pass_rate:.1f}%</p>
-            </div>
+        <div style="margin: 20px 0; font-family: Arial, sans-serif; display: flex; justify-content: space-between;">
+            <div>测试开始时间：<strong>{test_start_time}</strong></div>
+            <div>测试结束时间：<strong>{test_end_time}</strong></div>
+        </div>
+        
+        <div style="display: flex; align-items: center; margin: 20px 0; gap: 40px;">
             <div style="flex: 1; text-align: center;">
                 <svg width="120" height="120" viewBox="0 0 120 120">
                     <circle cx="60" cy="60" r="50" fill="#f0f0f0" />
@@ -945,9 +958,38 @@ def send_report_email(report_path: Path, results: list) -> None:
                     <text x="60" y="75" text-anchor="middle" font-size="10" fill="#666">通过率</text>
                 </svg>
             </div>
+            <div style="flex: 2;">
+                <table border="1" cellpadding="10" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; text-align: center;">
+                    <tr style="background-color: #f2f2f2; font-weight: bold;">
+                        <td>总用例数</td>
+                        <td>失败</td>
+                        <td>通过</td>
+                        <td>通过率</td>
+                    </tr>
+                    <tr>
+                        <td>{total}</td>
+                        <td>{failed}</td>
+                        <td>{passed}</td>
+                        <td>{pass_rate:.1f}%</td>
+                    </tr>
+                </table>
+            </div>
         </div>
         
-        <p>详细报告请查看附件（Allure 格式 HTML）。</p>
+        <h3 style="margin-top: 30px; margin-bottom: 15px;">用例详情</h3>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; text-align: center;">
+            <tr style="background-color: #f2f2f2; font-weight: bold;">
+                <td>序号</td>
+                <td style="text-align: left;">用例名称</td>
+                <td>开始时间</td>
+                <td>结束时间</td>
+                <td>耗时</td>
+                <td>状态</td>
+            </tr>
+            {case_details}
+        </table>
+        
+        <p style="margin-top: 20px;">详细报告请查看附件（Allure 格式 HTML）。</p>
         """
         
         msg.attach(MIMEText(body, "html", "utf-8"))

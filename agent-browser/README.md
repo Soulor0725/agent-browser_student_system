@@ -82,8 +82,8 @@ python app.py
 ### 4.3 查看测试结果
 
 - **终端输出**：实时显示测试进度和结果
-- **HTML 报告**：生成在 `reports/` 目录，文件名格式：`系统名_年月日时分秒.html`
-- **截图**：保存在 `screenshots/` 目录
+- **HTML 报告**：生成在 `output/` 目录，文件名格式：`系统名_年月日时分秒.html`
+- **截图**：保存在 `output/` 目录
   - 失败截图：`用例名称_年月日时分秒.png`
   - 成功截图：保留 1 小时后自动删除
 
@@ -139,8 +139,7 @@ python app.py
 agent-browser/
 ├── app.py              # 主测试脚本
 ├── requirements.txt    # Python 依赖
-├── screenshots/        # 测试截图
-├── reports/            # 测试报告
+├── output/             # 测试输出（报告和截图）
 └── README.md           # 项目文档
 ```
 
